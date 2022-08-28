@@ -1,11 +1,10 @@
 from fastapi import APIRouter
-from app import app
 
 
-api_router = APIRouter()
+router = APIRouter()
 
 
-@app.get("/whisper")
+@router.get("/v1/whisper")
 def whisper(text: str):
     return [city for city in scraper.cities if ls.normalized_similarity(text, city) > 0.5]
 

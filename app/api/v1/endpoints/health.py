@@ -1,10 +1,9 @@
 from fastapi import APIRouter
-from app import app
 
 
-api_router = APIRouter()
+router = APIRouter()
 
 
-@app.get('/ping')
+@router.get('/ping')
 def ping():
     return 'pong'

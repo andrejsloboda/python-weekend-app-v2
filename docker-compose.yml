@@ -20,6 +20,7 @@ services:
       - REDIS_PORT=6379
       - REDIS_DB=0
       - REDIS_DECODE_RESPONSES=True
+      - CURRENCY_RATE_URL=https://api.skypicker.com/rates
       - REGIOJET_BASE_URL=https://brn-ybus-pubapi.sa.cz/restapi/routes/search/simple
       - REGIOJET_LOCATIONS_URL=https://brn-ybus-pubapi.sa.cz/restapi/consts/locations 
       - REGIOJET_CURRENCY_RATES=https://api.skypicker.com/rates

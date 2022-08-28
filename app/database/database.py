@@ -6,7 +6,7 @@ from sqlalchemy.pool import NullPool
 from sqlalchemy.types import Date
 from sqlalchemy.orm import aliased, sessionmaker
 from sqlalchemy.sql.expression import cast
-from ..schemas import Route, RouteCombination 
+from ..scraper.schemas import Route
 from ..settings import settings 
 from ..database.models import RouteORM, Base
 
@@ -49,21 +49,20 @@ def is_in_db(origin: str, destination: str, departure_date: date) -> bool:
             return False
 
 
-def get_combinations_from_db(origin: str, destination: str, departure_date: date) -> List[RouteCombination]:
-    seg1 = aliased(RouteORM, name="segment1")
-    seg2 = aliased(RouteORM, name="segment2")
-    with Session() as session:
-        result = session.query(
-            seg1, seg2
-        ).join(
-            seg2, 
-            seg1.destination == seg2.origin
-        ).filter(
-            seg1.origin == slugify(origin),
-            seg2.destination == slugify(destination),
-            seg2.departure - seg1.arrival > timedelta(hours=1),
-            seg2.departure - seg1.arrival < timedelta(hours=6),
-            cast(seg1.departure, Date) == departure_date
-        ).all()
-        
-    return [RouteCombination(routes=[seg1, seg2]) for seg1, seg2 in result]
+# def get_combinations_from_db(origin: str, destination: str, departure_date: date) -> List[RouteCombination]:
+#     seg1 = aliased(RouteORM, name="segment1")
+#     seg2 = aliased(RouteORM, name="segment2")
+#     with Session() as session:
+#         result = session.query(
+#             seg1, seg2
+#         ).join(
+#             seg2,
+#             seg1.destination == seg2.origin
+#         ).filter(
+#             seg1.origin == slugify(origin),
+#             seg2.destination == slugify(destination),
+#             seg2.departure - seg1.arrival > timedelta(hours=1),
+#             seg2.departure - seg1.arrival < timedelta(hours=6),
+#             cast(seg1.departure, Date) == departure_date
+#         ).all()
+#     return [RouteCombination(routes=[seg1, seg2]) for seg1, seg2 in result]

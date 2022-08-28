@@ -1,17 +1,16 @@
 import uvicorn
-from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI
 from .api.v1.router import v1_api_router
 
-# Init FastAPI
 app = FastAPI()
 
 # API configuration for front-end
 origins = ["*"]
-app.add_middleware( 
+app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True, 
+    allow_credentials=True,
     allow_methods=["GET"],
     allow_headers=["application/json"]
 )

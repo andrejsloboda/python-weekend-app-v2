@@ -24,6 +24,20 @@ class Route(BaseModel):
         }
 
 
+class RouteCombination(BaseModel):
+    routes: List[Route]
+
+    class Config:
+        orm_mode = True
+        json_encoders = {
+            datetime: lambda t: t.strftime(format="%Y-%m-%d %H:%M:%S")
+        }
+
+
+class RouteList(BaseModel):
+    __root__: List[Route]
+
+
 class FlixbusLocation(BaseModel):
     lon: float
     lat: float

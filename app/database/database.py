@@ -1,14 +1,14 @@
 from typing import List
-from datetime import date, timedelta 
+from datetime import date
 from slugify import slugify
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Row
 from sqlalchemy.pool import NullPool
 from sqlalchemy.types import Date
-from sqlalchemy.orm import aliased, sessionmaker
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql.expression import cast
-from ..scraper.schemas import Route
-from ..settings import settings 
-from ..database.models import RouteORM, Base
+from app.settings import settings
+from app.database.models import RouteORM, Base
 
 
 DATABASE_URL = f"postgresql://{settings.db_user}:{settings.db_password}@\
@@ -19,7 +19,7 @@ Base.metadata.create_all(engine)
 Session = sessionmaker(engine, autocommit=False, autoflush=False)
 
 
-def add_routes_to_db(routes: List[Route]) -> None:
+def add_routes_to_db(routes: List[RouteORM]) -> None:
     if routes:
         with Session() as session:
             for route in routes:
@@ -27,14 +27,20 @@ def add_routes_to_db(routes: List[Route]) -> None:
             session.commit()
 
 
-def get_routes_from_db(origin: str, destination: str, departure_date: date) -> List[RouteORM]:
+def get_distinct_routes_from_db() -> List[Row]:
+    with engine.connect() as connection:
+        select_query = "SELECT DISTINCT origin, destination FROM public.journeys_asloboda"
+        data = connection.execute(text(select_query)).fetchall()
+        return data
+
+
+def get_data_from_db(departure_date: date) -> List[RouteORM]:
     with Session() as session:
         routes = session.query(RouteORM).filter(
-            RouteORM.origin == slugify(origin),
-            RouteORM.destination == slugify(destination),
-            cast(RouteORM.departure, Date) == departure_date
+            cast(RouteORM.departure, Date) == departure_date,
+            RouteORM.free_seats > 0
         ).all()
-    return routes
+        return routes
 
 
 def is_in_db(origin: str, destination: str, departure_date: date) -> bool:
@@ -49,20 +55,6 @@ def is_in_db(origin: str, destination: str, departure_date: date) -> bool:
             return False
 
 
-# def get_combinations_from_db(origin: str, destination: str, departure_date: date) -> List[RouteCombination]:
-#     seg1 = aliased(RouteORM, name="segment1")
-#     seg2 = aliased(RouteORM, name="segment2")
-#     with Session() as session:
-#         result = session.query(
-#             seg1, seg2
-#         ).join(
-#             seg2,
-#             seg1.destination == seg2.origin
-#         ).filter(
-#             seg1.origin == slugify(origin),
-#             seg2.destination == slugify(destination),
-#             seg2.departure - seg1.arrival > timedelta(hours=1),
-#             seg2.departure - seg1.arrival < timedelta(hours=6),
-#             cast(seg1.departure, Date) == departure_date
-#         ).all()
-#     return [RouteCombination(routes=[seg1, seg2]) for seg1, seg2 in result]
+
+
+

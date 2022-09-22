@@ -1,13 +1,16 @@
+import asyncio
 import json
 from abc import ABC, abstractmethod
 from datetime import date, datetime
 from typing import Union, List
-
-import requests
+import aiohttp
 from slugify import slugify
+from app.settings import settings
+from app.scraper.schemas import FlixbusSearchResponse, FlixbusCity, Route, RegiojetSearchResponse
 
-# from ..settings import settings
-from .schemas import FlixbusSearchResponse, FlixbusCity, Route, RegiojetSearchResponse
+
+class SundairScraper:
+    pass
 
 
 class Scraper(ABC):
@@ -18,32 +21,25 @@ class Scraper(ABC):
         self.locations_url: str
 
     @abstractmethod
-    def get_location_id(self, location: str) -> Union[str, None]:
+    def get_location_id(self, session: aiohttp.ClientSession, location: str) -> Union[str, None]:
         pass
 
     @abstractmethod
-    def get_search_data(self, origin: str, destination: str, departure_date: date) -> Union[List[Route], None]:
+    def get_search_data(self, session: aiohttp.ClientSession, origin: str, destination: str,
+                              departure_date: date) -> Union[List[Route], None]:
         pass
 
 
 class RegiojetScraper(Scraper):
 
     def __init__(self) -> None:
-        # self.locations_url = settings.regiojet_locations_url
-        # self.base_url = settings.regiojet_base_url
-        self.locations_url = 'https://brn-ybus-pubapi.sa.cz/restapi/consts/locations'
-        self.base_url = 'https://brn-ybus-pubapi.sa.cz/restapi/routes/search/simple'
+        self.locations_url = settings.regiojet_location_url
+        self.base_url = settings.regiojet_base_url
 
-    def get_location_id(self, location: str) -> Union[str, None]:
-        try:
-            locations_response = requests.get(self.locations_url).json()
-
-        except requests.RequestException as e:
-            print(e)
-            return None
-
-        finally:
-            for country in locations_response:
+    async def get_location_id(self, session: aiohttp.ClientSession, location: str) -> Union[str, None]:
+        async with session.get(self.locations_url) as location_response:
+            location_response = await location_response.json()
+            for country in location_response:
                 for city in country['cities']:
                     if city['name'] == location:
                         return city['id']
@@ -52,55 +48,50 @@ class RegiojetScraper(Scraper):
                             if alias == location:
                                 return city['id']
 
-    def get_search_data(self, origin: str, destination: str, departure_date: date) -> Union[List[Route], None]:
+    async def get_search_data(self, session: aiohttp.ClientSession, origin: str, destination: str,
+                              departure_date: date) -> Union[List[Route], None]:
+
         if departure_date >= datetime.today().date():
 
             search_params = {
                 'tariffs': 'REGULAR',
                 'toLocationType': 'CITY',
-                'toLocationId': self.get_location_id(destination),
+                'toLocationId': await self.get_location_id(session, destination),
                 'fromLocationType': 'CITY',
-                'fromLocationId': self.get_location_id(origin),
-                'departureDate': departure_date
+                'fromLocationId': await self.get_location_id(session, origin),
+                'departureDate': departure_date.strftime('%Y-%m-%d')
             }
 
-            try:
-                response = RegiojetSearchResponse(**requests.get(self.base_url, params=search_params).json())
+            async with session.get(self.base_url, params=search_params) as response_raw:
+                response = await response_raw.json()
+                response = RegiojetSearchResponse(**response)
 
-            except requests.RequestException as e:
-                print(e)
-                return []
-
-            finally:
-                routes = []
-
-                for route in response.routes:
-                    if route.priceFrom > 0:
-                        route = Route(
-                            origin=slugify(origin),
-                            destination=slugify(destination),
-                            departure=route.departureTime,
-                            arrival=route.arrivalTime,
-                            carrier="REGIOJET",
-                            vehicle_type=route.vehicleTypes.pop(),
-                            price=route.priceFrom,
-                            currency="EUR",
-                            source_id=route.departureStationId,
-                            destination_id=route.arrivalStationId,
-                            free_seats=route.freeSeatsCount)
-                        routes.append(route)
-                return routes
-        else:
-            return None
+            routes = []
+            for route in response.routes:
+                if route.priceFrom > 0:
+                    route = Route(
+                        origin=slugify(origin),
+                        destination=slugify(destination),
+                        departure=route.departureTime,
+                        arrival=route.arrivalTime,
+                        carrier="REGIOJET",
+                        vehicle_type=route.vehicleTypes.pop(),
+                        price=route.priceFrom,
+                        currency="EUR",
+                        source_id=route.departureStationId,
+                        destination_id=route.arrivalStationId,
+                        free_seats=route.freeSeatsCount)
+                    routes.append(route)
+            return routes
 
 
 class FlixbusScraper(Scraper):
 
     def __init__(self) -> None:
-        self.base_url = 'https://global.api.flixbus.com/search/service/v4/search'
-        self.location_url = 'https://global.api.flixbus.com/search/autocomplete/cities'
+        self.base_url = settings.flixbus_base_url
+        self.location_url = settings.flixbus_location_url
 
-    def get_location_id(self, location: str) -> Union[str, None]:
+    async def get_location_id(self, session: aiohttp.ClientSession, location: str) -> Union[str, None]:
 
         location_params = {
             'q': location,
@@ -109,17 +100,12 @@ class FlixbusScraper(Scraper):
             'flixbus_cities_only': 'false'
         }
 
-        try:
-            location_response_raw = requests.get(url=self.location_url, params=location_params)
+        async with session.get(self.location_url, params=location_params) as location_response:
+            response = await location_response.json()
+            return FlixbusCity(**response[0]).id
 
-        except requests.exceptions.RequestException as e:
-            print(e)
-            return None
-
-        finally:
-            return FlixbusCity(**location_response_raw.json()[0]).id
-
-    def get_search_data(self, origin: str, destination: str, departure_date: date) -> Union[List[Route], None]:
+    async def get_search_data(self, session: aiohttp.ClientSession, origin: str, destination: str,
+                              departure_date: date) -> Union[List[Route], None]:
         if departure_date >= datetime.today().date():
             format_date_out = "%d.%m.%Y"
             departure_date_in = departure_date
@@ -132,8 +118,8 @@ class FlixbusScraper(Scraper):
             }
 
             search_params = {
-                'from_city_id': self.get_location_id(origin),
-                'to_city_id': self.get_location_id(destination),
+                'from_city_id': await self.get_location_id(session, origin),
+                'to_city_id': await self.get_location_id(session, destination),
                 'departure_date': departure_date_out,
                 'products': json.dumps(products),
                 'currency': 'EUR',
@@ -142,16 +128,10 @@ class FlixbusScraper(Scraper):
                 'include_after_midnight_rides': 0
             }
 
-            try:
-                search_response_raw = requests.get(url=self.base_url, params=search_params)
+            async with session.get(url=self.base_url, params=search_params) as response:
+                response = await response.json()
+                search_response = FlixbusSearchResponse(**response)
 
-            except requests.RequestException as e:
-                print(e)
-                return []
-
-            finally:
-                search_response = FlixbusSearchResponse(**search_response_raw.json())
-                print(type(search_response.trips[0].departure_city_id), type(search_response.trips[0].departure_city_id))
                 routes = []
                 for result in search_response.trips[0].results:
                     r = search_response.trips[0].results[result]
@@ -173,10 +153,19 @@ class FlixbusScraper(Scraper):
             return None
 
 
-def scrape(origin: str, destination: str, departure_date: date) -> Union[List[Route], None]:
-    scrapers = [FlixbusScraper(), RegiojetScraper()]
-    scraped_data = []
+async def get_all_tasks(session, base_routes, departure_date):
+    scrapers = [RegiojetScraper(), FlixbusScraper()]
+    tasks = []
     for scraper in scrapers:
-        scraped_data.extend(scraper.get_search_data(origin, destination, departure_date))
-    return scraped_data
+        for routes in base_routes:
+            for route in routes:
+                task = asyncio.create_task(scraper.get_search_data(session, route.origin.capitalize(),
+                                                                   route.destination.capitalize(), departure_date))
+                tasks.append(task)
+    result = await asyncio.gather(*tasks)
+    return result
 
+
+async def scrape_base_routes(base_routes, departure_date):
+    async with aiohttp.ClientSession() as session:
+        return await get_all_tasks(session, base_routes, departure_date)

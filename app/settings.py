@@ -15,14 +15,13 @@ class Settings(BaseSettings):
     redis_decode_responses: bool
     currency_rate_url: str
     regiojet_base_url: str
-    regiojet_locations_url: str
-    regiojet_currency_rates: str
+    regiojet_location_url: str
     flixbus_base_url: str
-    flixbus_locations_url: str
-    flixbus_currency_rates: str
+    flixbus_location_url: str
+
 
     class Config:
-        env_file = "../.env"
+        env_file = './.env'
 
 
 settings = Settings()

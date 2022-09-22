@@ -2,7 +2,7 @@ import json
 from typing import List, Union
 from redis import Redis
 from app.settings import settings
-from app.schemas import Route, RouteList
+from app.scraper.schemas import Route, RouteList
 
 
 class Cache:

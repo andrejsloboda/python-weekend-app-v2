@@ -7,16 +7,6 @@ from app.api.v1.router import v1_api_router
 app = FastAPI()
 
 
-@app.on_event("startup")
-def startup_event():
-    pass
-
-
-@app.on_event("shutdown")
-def shutdown_event():
-    pass
-
-
 # API configuration for front-end
 origins = ["*"]
 app.add_middleware(

@@ -2,7 +2,7 @@ from typing import List
 from collections import defaultdict
 from datetime import timedelta
 from sqlalchemy.engine import Row
-from app.database.database import RouteORM
+from app.database.database import Route
 
 
 class BaseGraph:
@@ -38,11 +38,11 @@ class BaseGraph:
 
 
 class Graph:
-    def __init__(self, raw_data: List[RouteORM]) -> None:
+    def __init__(self, raw_data: List[Route]) -> None:
         self.graph = defaultdict(list)
         self._process_data(raw_data)
 
-    def _process_data(self, raw_data: List[RouteORM]) -> None:
+    def _process_data(self, raw_data: List[Route]) -> None:
         for record in raw_data:
             self._add_node(record)
 
@@ -53,10 +53,10 @@ class Graph:
                         timedelta(hours=1) <= layover <= timedelta(hours=6):
                     self._add_edge(node_a, node_b)
 
-    def _add_edge(self, node_a: RouteORM, node_b: RouteORM) -> None:
+    def _add_edge(self, node_a: Route, node_b: Route) -> None:
         self.graph[node_a].append(node_b)
 
-    def _add_node(self, node: RouteORM) -> None:
+    def _add_node(self, node: Route) -> None:
         self.graph[node] = list()
 
     def __getitem__(self, item):

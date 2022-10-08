@@ -1,20 +1,23 @@
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.dialects.postgresql import TIMESTAMP
+from sqlalchemy.dialects.postgresql import TIMESTAMP, UUID
 from sqlalchemy import Column, Integer, String, DECIMAL
 
 Base = declarative_base()
 
 
-class LocationsORM(Base):
-    __tablename__ = "locations"
+class City(Base):
+    __tablename__ = 'cities'
     id = Column(Integer, primary_key=True)
-    location_id = Column(Integer)
-    location_name = Column(String(255))
-    language = Column(String(45))
+    city = Column(String)
+    slug = Column(String)
+    language = Column(String)
+    city_id = Column(UUID)
+    lat = Column(DECIMAL)
+    lon = Column(DECIMAL)
 
 
-class RouteORM(Base):
-    __tablename__ = "journeys_asloboda"
+class Route(Base):
+    __tablename__ = "journeys"
     id = Column(Integer, primary_key=True)
     origin = Column(String(255))
     destination = Column(String(255))

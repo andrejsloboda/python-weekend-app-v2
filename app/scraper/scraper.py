@@ -6,11 +6,9 @@ from typing import Union, List
 import aiohttp
 from slugify import slugify
 from app.settings import settings
-from app.scraper.schemas import FlixbusSearchResponse, FlixbusCity, Route, RegiojetSearchResponse
-
-
-class SundairScraper:
-    pass
+from app.database.models import Route
+from app.database import database
+from app.scraper import FlixbusSearchResponse, FlixbusCity, RegiojetSearchResponse
 
 
 class Scraper(ABC):
@@ -26,7 +24,7 @@ class Scraper(ABC):
 
     @abstractmethod
     def get_search_data(self, session: aiohttp.ClientSession, origin: str, destination: str,
-                              departure_date: date) -> Union[List[Route], None]:
+                        departure_date: date) -> Union[List[Route], None]:
         pass
 
 
@@ -53,6 +51,9 @@ class RegiojetScraper(Scraper):
 
         if departure_date >= datetime.today().date():
 
+            # origin_id = database.get_city_id(origin)
+            # destination_id = database.get_city_id(destination)
+
             search_params = {
                 'tariffs': 'REGULAR',
                 'toLocationType': 'CITY',
@@ -72,8 +73,8 @@ class RegiojetScraper(Scraper):
                     route = Route(
                         origin=slugify(origin),
                         destination=slugify(destination),
-                        departure=route.departureTime,
-                        arrival=route.arrivalTime,
+                        departure=datetime.fromisoformat(route.departureTime),
+                        arrival=datetime.fromisoformat(route.arrivalTime),
                         carrier="REGIOJET",
                         vehicle_type=route.vehicleTypes.pop(),
                         price=route.priceFrom,
@@ -111,6 +112,9 @@ class FlixbusScraper(Scraper):
             departure_date_in = departure_date
             departure_date_out = datetime.strftime(departure_date_in, format_date_out)
 
+            origin_id = database.get_city_id(origin)
+            destination_id = database.get_city_id(destination)
+
             products = {
                 "adult": 1,
                 "children_0_5": 0,
@@ -136,10 +140,10 @@ class FlixbusScraper(Scraper):
                 for result in search_response.trips[0].results:
                     r = search_response.trips[0].results[result]
                     route = Route(
-                        origin=slugify(origin),
-                        destination=slugify(destination),
-                        departure=r['departure']['date'],
-                        arrival=r['arrival']['date'],
+                        origin=origin_id,
+                        destination=destination_id,
+                        departure=datetime.fromisoformat(r['departure']['date']),
+                        arrival=datetime.fromisoformat(r['arrival']['date']),
                         carrier='FLIXBUS',
                         price=r['price']['total'],
                         vehicle_type=search_response.trips[0].means_of_transport[0],
@@ -154,7 +158,7 @@ class FlixbusScraper(Scraper):
 
 
 async def get_all_tasks(session, base_routes, departure_date):
-    scrapers = [RegiojetScraper(), FlixbusScraper()]
+    scrapers = [FlixbusScraper(), RegiojetScraper()]
     tasks = []
     for scraper in scrapers:
         for routes in base_routes:

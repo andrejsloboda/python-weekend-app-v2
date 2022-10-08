@@ -7,6 +7,8 @@ from app.api.v1.router import v1_api_router
 app = FastAPI()
 
 
+
+
 # API configuration for front-end
 origins = ["*"]
 app.add_middleware(
